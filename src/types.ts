@@ -7,6 +7,8 @@ export type HotspotKind =
 
 export interface RawPgPlanNode {
   "Node Type": string;
+  "Parent Relationship"?: string;
+  "Single Copy"?: boolean;
   "Relation Name"?: string;
   "Index Name"?: string;
   Alias?: string;
@@ -88,12 +90,13 @@ export interface PlanDiffResult {
   beforeMs: number;
   afterMs: number;
   deltaMs: number;
-  deltaPct: number;
+  deltaPct: number | null;
   beforeSharedRead: number;
   afterSharedRead: number;
   beforeTempBlocks: number;
   afterTempBlocks: number;
   resolvedHotspots: Hotspot[];
+  newHotspots: Hotspot[];
   remainingHotspots: Hotspot[];
   before: PlanAnalysis;
   after: PlanAnalysis;

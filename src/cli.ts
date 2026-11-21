@@ -62,7 +62,7 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
       return parsed;
     } else if (arg === "--demo") {
       setMode("demo");
-    } else if (arg === "diff") {
+    } else if (arg === "diff" && explicitMode === null && parsed.files.length === 0) {
       setMode("diff");
     } else if (arg === "--json") {
       parsed.json = true;
@@ -78,6 +78,18 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
     }
   }
 
+  if (parsed.json && parsed.markdown) {
+    throw new Error("Cannot combine --json and --markdown.");
+  }
+  if (parsed.mode === "demo" && parsed.files.length > 0) {
+    throw new Error("Cannot pass input files together with --demo.");
+  }
+  if (parsed.mode === "diff" && parsed.htmlOut) {
+    throw new Error("--html is only supported for single-plan analysis or --demo, not diff.");
+  }
+  if (parsed.mode === "analyze" && parsed.markdown) {
+    throw new Error("--markdown is only supported for diff or --demo.");
+  }
   if (parsed.mode === "diff" && parsed.files.length !== 2) {
     throw new Error("Usage: planflare diff <before.json> <after.json>");
   }
@@ -142,16 +154,18 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (args.files.length === 0 && process.stdin.isTTY) {
+    printHelp();
+    return;
+  }
+
   const rawText =
     args.files.length === 1
       ? readFileSync(resolve(args.files[0]), "utf8")
-      : process.stdin.isTTY
-        ? ""
-        : await readStdinText();
+      : await readStdinText();
 
   if (!rawText.trim()) {
-    printHelp();
-    return;
+    throw new Error("Empty EXPLAIN JSON input.");
   }
 
   const analysis = analyzeExplainPlan(parseExplainJson(rawText));

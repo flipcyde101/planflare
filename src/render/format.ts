@@ -5,7 +5,27 @@ function escapeHtml(text: string): string {
 }
 
 function safeJson(data: unknown): string {
-  return JSON.stringify(data).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026");
+  return JSON.stringify(data)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
+function escapeMdInline(text: string): string {
+  return text.replace(/[\r\n]+/g, " ").replace(/`/g, "'").replace(/\|/g, "\\|");
+}
+
+function formatPct(pct: number | null): string {
+  if (pct === null) return "n/a";
+  return `${pct}%`;
+}
+
+function formatDeltaPct(deltaPct: number | null): string {
+  if (deltaPct === null) return "n/a";
+  const sign = deltaPct > 0 ? "+" : "";
+  return `${sign}${deltaPct}%`;
 }
 
 function renderBar(pct: number, width = 22): string {
@@ -14,7 +34,7 @@ function renderBar(pct: number, width = 22): string {
 }
 
 export function formatTerminalFlamegraph(analysis: PlanAnalysis): string {
-  const bufStr = analysis.overallBufferHitPct !== null ? `${analysis.overallBufferHitPct}%` : "n/a";
+  const bufStr = formatPct(analysis.overallBufferHitPct);
   const lines: string[] = [
     `planflare · Exec: ${analysis.executionTimeMs.toFixed(2)} ms · Plan: ${analysis.planningTimeMs.toFixed(2)} ms · Buffer Hit: ${bufStr} · Nodes: ${analysis.nodeCount}`,
     `Hotspots: ${analysis.hotspots.length}`,
@@ -22,7 +42,7 @@ export function formatTerminalFlamegraph(analysis: PlanAnalysis): string {
   ];
 
   const walk = (node: AnalyzedNode): void => {
-    const indent = "  ".repeat(node.depth);
+    const indent = "  ".repeat(Math.min(node.depth, 20));
     const bar = renderBar(node.percentOfTotal, 18);
     const badge = node.hotspots.length > 0 ? ` [${node.hotspots.map((h) => h.kind).join(", ")}]` : "";
     lines.push(
@@ -44,17 +64,23 @@ export function formatTerminalFlamegraph(analysis: PlanAnalysis): string {
 }
 
 export function formatTerminalDiff(diff: PlanDiffResult): string {
-  const sign = diff.deltaPct > 0 ? "+" : "";
   const lines: string[] = [
-    `planflare diff · ${diff.beforeMs.toFixed(2)} ms -> ${diff.afterMs.toFixed(2)} ms (${sign}${diff.deltaPct}%)`,
+    `planflare diff · ${diff.beforeMs.toFixed(2)} ms -> ${diff.afterMs.toFixed(2)} ms (${formatDeltaPct(diff.deltaPct)})`,
     `Shared Reads: ${diff.beforeSharedRead.toLocaleString("en-US")} -> ${diff.afterSharedRead.toLocaleString("en-US")} blocks | Temp Spill: ${diff.beforeTempBlocks} -> ${diff.afterTempBlocks} blocks`,
-    `Hotspots: ${diff.before.hotspots.length} -> ${diff.after.hotspots.length} (${diff.resolvedHotspots.length} resolved)`,
+    `Hotspots: ${diff.before.hotspots.length} -> ${diff.after.hotspots.length} (${diff.resolvedHotspots.length} resolved, ${diff.newHotspots.length} new)`,
   ];
 
   if (diff.resolvedHotspots.length > 0) {
     lines.push("", "Resolved Hotspots:");
     for (const h of diff.resolvedHotspots) {
       lines.push(`  - RESOLVED [${h.kind}] ${h.nodeLabel}: ${h.summary}`);
+    }
+  }
+
+  if (diff.newHotspots.length > 0) {
+    lines.push("", "New Hotspots:");
+    for (const h of diff.newHotspots) {
+      lines.push(`  - NEW [${h.kind}] ${h.nodeLabel}: ${h.summary}`);
     }
   }
 
@@ -69,16 +95,15 @@ export function formatTerminalDiff(diff: PlanDiffResult): string {
 }
 
 export function formatMarkdownDiff(diff: PlanDiffResult): string {
-  const sign = diff.deltaPct > 0 ? "+" : "";
   const lines: string[] = [
-    `### planflare Query Plan Diff (${diff.beforeMs.toFixed(1)} ms -> ${diff.afterMs.toFixed(1)} ms, ${sign}${diff.deltaPct}%)`,
+    `### planflare Query Plan Diff (${diff.beforeMs.toFixed(1)} ms -> ${diff.afterMs.toFixed(1)} ms, ${formatDeltaPct(diff.deltaPct)})`,
     "",
     "| Metric | Before | After |",
     "|---|---:|---:|",
     `| **Execution Time** | ${diff.beforeMs.toFixed(2)} ms | ${diff.afterMs.toFixed(2)} ms |`,
     `| **Shared Blocks Read** | ${diff.beforeSharedRead.toLocaleString("en-US")} | ${diff.afterSharedRead.toLocaleString("en-US")} |`,
     `| **Temp Spill Blocks** | ${diff.beforeTempBlocks.toLocaleString("en-US")} | ${diff.afterTempBlocks.toLocaleString("en-US")} |`,
-    `| **Buffer Hit %** | ${diff.before.overallBufferHitPct ?? "n/a"}% | ${diff.after.overallBufferHitPct ?? "n/a"}% |`,
+    `| **Buffer Hit %** | ${formatPct(diff.before.overallBufferHitPct)} | ${formatPct(diff.after.overallBufferHitPct)} |`,
     `| **Hotspots** | ${diff.before.hotspots.length} | ${diff.after.hotspots.length} |`,
     "",
   ];
@@ -86,7 +111,19 @@ export function formatMarkdownDiff(diff: PlanDiffResult): string {
   if (diff.resolvedHotspots.length > 0) {
     lines.push("**Resolved Hotspots:**");
     for (const h of diff.resolvedHotspots) {
-      lines.push(`- \`${h.kind}\` on \`${h.nodeLabel}\`: ${h.summary}`);
+      lines.push(`- \`${h.kind}\` on \`${escapeMdInline(h.nodeLabel)}\`: ${escapeMdInline(h.summary)}`);
+    }
+    lines.push("");
+  }
+
+  const openHotspots = [...diff.newHotspots, ...diff.remainingHotspots];
+  if (openHotspots.length > 0) {
+    lines.push("**New / Remaining Hotspots:**");
+    for (const h of diff.newHotspots) {
+      lines.push(`- [NEW] \`${h.kind}\` on \`${escapeMdInline(h.nodeLabel)}\`: ${escapeMdInline(h.summary)}`);
+    }
+    for (const h of diff.remainingHotspots) {
+      lines.push(`- [OPEN] \`${h.kind}\` on \`${escapeMdInline(h.nodeLabel)}\`: ${escapeMdInline(h.summary)}`);
     }
     lines.push("");
   }
@@ -126,7 +163,7 @@ export function formatHtmlFlamegraph(analysis: PlanAnalysis, title = "PostgreSQL
     function renderNode(n) {
       const el = document.createElement("div");
       el.className = n.hotspots.length > 0 ? "node hot" : "node";
-      el.style.marginLeft = (n.depth * 20) + "px";
+      el.style.marginLeft = (Math.min(n.depth, 20) * 16) + "px";
       const top = document.createElement("div");
       top.textContent = n.label + " | " + n.exclusiveMs.toFixed(1) + " ms self (" + n.percentOfTotal + "%) | est=" + n.planRows + " act=" + n.actualRows;
       for (const h of n.hotspots) {
@@ -139,7 +176,7 @@ export function formatHtmlFlamegraph(analysis: PlanAnalysis, title = "PostgreSQL
       bw.className = "bar-wrap";
       const bf = document.createElement("div");
       bf.className = "bar-fill";
-      bf.style.width = Math.max(2, n.percentOfTotal) + "%";
+      bf.style.width = (n.percentOfTotal > 0 ? Math.max(2, n.percentOfTotal) : 0) + "%";
       bw.appendChild(bf);
       el.append(top, bw);
       rootEl.appendChild(el);

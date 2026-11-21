@@ -41,7 +41,7 @@ npx planflare diff before.json after.json --markdown
 - **`ROW_MISESTIMATE`:** Planner cardinality off by `>= 10x` (critical at `>= 100x`).
 - **`DISK_SPILL`:** External disk sorts (`Sort Space Type: "Disk"`) or temp block spills.
 - **`LOW_BUFFER_HIT`:** Shared buffer hit ratio below `80%` with significant disk reads.
-- **`HIGH_FILTER_REMOVAL`:** Filters discarding `> 5x` more rows than returned.
+- **`HIGH_FILTER_REMOVAL`:** Filters discarding `>= 5,000` rows and `> 2x` more rows than returned.
 
 ---
 
