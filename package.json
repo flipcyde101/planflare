@@ -1,0 +1,52 @@
+{
+  "name": "planflare",
+  "version": "0.1.0",
+  "description": "Offline PostgreSQL EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) flamegraph, hotspot detector, and before/after plan diff CLI (zero runtime dependencies).",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/flipcyde101/planflare.git"
+  },
+  "homepage": "https://github.com/flipcyde101/planflare#readme",
+  "bugs": {
+    "url": "https://github.com/flipcyde101/planflare/issues"
+  },
+  "bin": {
+    "planflare": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "pretest": "npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run typecheck && npm run build && npm test"
+  },
+  "keywords": [
+    "postgresql",
+    "postgres",
+    "explain-analyze",
+    "flamegraph",
+    "sql",
+    "query-optimization",
+    "performance",
+    "cli",
+    "offline",
+    "devtools"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.4"
+  }
+}
