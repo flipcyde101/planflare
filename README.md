@@ -8,6 +8,12 @@
 
 ---
 
+## 15-second demo
+
+[![Planflare compares slow and indexed PostgreSQL query plans](./docs/media/planflare-poster.png)](./docs/media/planflare-demo.mp4)
+
+[Open the demo video (MP4)](./docs/media/planflare-demo.mp4)
+
 ## Try It in 1 Second (Zero Setup)
 
 ```bash
