@@ -1,0 +1,7 @@
+node_modules/
+dist/
+work/
+.planflare/
+.superpowers/
+.DS_Store
+Thumbs.db
